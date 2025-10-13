@@ -1,2 +1,0 @@
-# Vizsgaremek-csopi
-Időpontfoglaló
