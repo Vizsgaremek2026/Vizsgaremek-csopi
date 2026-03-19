@@ -1,58 +1,37 @@
 import { useState } from "react";
+import { login } from "./api/auth";
 
-export default function Register({ onSwitch, onRegister }) {
+export default function Login({ onSwitch, onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [focusedInput, setFocusedInput] = useState(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim());
-
-  const handleRegister = () => {
+  const handleLogin = async () => {
     const em = email.trim();
     const pw = password.trim();
 
     if (!em || !pw) {
-      setError("Please enter your email and password!");
+      setError("Invalid email or password");
+      setEmail("");
+      setPassword("");
       return;
     }
 
-    if (!isValidEmail(em)) {
-      setError("Please enter a valid email address!");
-      return;
-    }
-
-    // load users list
-    let users = [];
-    try {
-      const raw = localStorage.getItem("users");
-      users = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(users)) users = [];
-    } catch {
-      users = [];
-    }
-
-    // prevent duplicates
-    const exists = users.some((u) => String(u?.email || "").trim().toLowerCase() === em.toLowerCase());
-    if (exists) {
-      setError("This email is already registered. Please log in.");
-      return;
-    }
-
-    // save new user
-    const nextUsers = [...users, { email: em, password: pw }];
-    try {
-      localStorage.setItem("users", JSON.stringify(nextUsers));
-    } catch {}
-
-    // session
-    try {
-      localStorage.setItem("loggedInUser", em);
-      localStorage.setItem("loggedInPassword", pw); // keep compatibility with your current app
-    } catch {}
-
+    setLoading(true);
     setError("");
-    onRegister();
+    try {
+      const result = await login(em, pw);
+      onLogin(result.email);
+    } catch (err) {
+      setError(err.message || "Invalid email or password");
+      setEmail("");
+      setPassword("");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,10 +55,11 @@ export default function Register({ onSwitch, onRegister }) {
           width: "320px",
           display: "flex",
           flexDirection: "column",
-          gap: "16px"
+          gap: "16px",
+          position: "relative"
         }}
       >
-        <h2 style={{ color: "#fff", textAlign: "center" }}>Register</h2>
+        <h2 style={{ color: "#fff", textAlign: "center" }}>Log in</h2>
 
         {error && (
           <div style={{ color: "red", textAlign: "center", marginBottom: "-8px" }}>
@@ -91,15 +71,19 @@ export default function Register({ onSwitch, onRegister }) {
           type="email"
           placeholder="Email"
           value={email}
-          autoComplete="off"
-          onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+          autoComplete="username"
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleLogin(); } }}
+          onFocus={() => setFocusedInput("email")}
+          onBlur={() => setFocusedInput(null)}
           onChange={(e) => setEmail(e.target.value)}
           style={{
             padding: "10px",
             borderRadius: "6px",
-            border: "none",
+            border: focusedInput === "email" ? "2px solid #fff" : "none",
             background: "#222",
-            color: "#fff"
+            color: "#fff",
+            width: "100%",
+            outline: "none"
           }}
         />
 
@@ -117,19 +101,20 @@ export default function Register({ onSwitch, onRegister }) {
             type={showPassword ? "text" : "password"}
             placeholder="Password"
             value={password}
-            autoComplete="new-password"
-            onKeyDown={(e) => e.key === "Enter" && handleRegister()}
+            autoComplete="current-password"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleLogin(); } }}
+            onFocus={() => setFocusedInput("password")}
+            onBlur={() => setFocusedInput(null)}
             onChange={(e) => setPassword(e.target.value)}
             style={{
               padding: "10px 40px 10px 10px",
-              border: "none",
+              border: focusedInput === "password" ? "2px solid #fff" : "none",
               background: "transparent",
               color: "#fff",
               width: "100%",
               outline: "none"
             }}
           />
-
           <span
             onClick={() => setShowPassword(!showPassword)}
             style={{
@@ -137,7 +122,7 @@ export default function Register({ onSwitch, onRegister }) {
               right: "10px",
               cursor: "pointer",
               fontSize: "20px",
-              color: "#ccc"
+              color: "#ffcc00"
             }}
           >
             {showPassword ? "🔓" : "🔒"}
@@ -145,7 +130,8 @@ export default function Register({ onSwitch, onRegister }) {
         </div>
 
         <button
-          onClick={handleRegister}
+          onClick={handleLogin}
+          disabled={loading}
           style={{
             padding: "12px",
             borderRadius: "6px",
@@ -153,12 +139,13 @@ export default function Register({ onSwitch, onRegister }) {
             background: "#1db954",
             color: "#fff",
             fontWeight: "600",
-            cursor: "pointer",
+            cursor: loading ? "not-allowed" : "pointer",
             transition: "transform 0.15s ease, box-shadow 0.15s ease",
-            boxShadow: "0 4px 10px rgba(0,0,0,0.3)"
+            boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+            opacity: loading ? 0.7 : 1
           }}
         >
-          Register
+          {loading ? "Logging in…" : "Log in"}
         </button>
 
         <button
@@ -173,7 +160,7 @@ export default function Register({ onSwitch, onRegister }) {
             transition: "transform 0.15s ease"
           }}
         >
-          Already have an Account? Log in
+          You don't have an Account? Register!
         </button>
       </div>
     </div>

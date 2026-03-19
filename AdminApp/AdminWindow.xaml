@@ -1,0 +1,176 @@
+<Window x:Class="AdminApp.AdminWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Admin panel"
+        Height="560"
+        Width="900"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid Margin="12">
+        <TabControl>
+
+            
+            <TabItem Header="Logok">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Logok"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Margin="0,0,0,10"/>
+
+                    <Grid Grid.Row="1" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <CheckBox x:Name="ChkInfo"
+                                  Content="INFO"
+                                  IsChecked="True"
+                                  Margin="0,0,12,0"
+                                  Checked="Filters_Changed"
+                                  Unchecked="Filters_Changed"/>
+
+                        <CheckBox x:Name="ChkWarn"
+                                  Content="WARN"
+                                  IsChecked="True"
+                                  Margin="0,0,12,0"
+                                  Grid.Column="1"
+                                  Checked="Filters_Changed"
+                                  Unchecked="Filters_Changed"/>
+
+                        <CheckBox x:Name="ChkError"
+                                  Content="ERROR"
+                                  IsChecked="True"
+                                  Margin="0,0,12,0"
+                                  Grid.Column="2"
+                                  Checked="Filters_Changed"
+                                  Unchecked="Filters_Changed"/>
+
+                        <TextBox x:Name="SearchBox"
+                                 Grid.Column="3"
+                                 Height="28"
+                                 Margin="0,0,12,0"
+                                 VerticalContentAlignment="Center"
+                                 TextChanged="SearchBox_TextChanged"
+                                 ToolTip="Kereses a log sorokban (pl. Eminem, quota, USER)"/>
+
+                        <Button Grid.Column="4"
+                                Content="Frissites"
+                                Height="28"
+                                Padding="14,0"
+                                Click="Refresh_Click"/>
+                    </Grid>
+
+                    <ListBox x:Name="LogList"
+                             Grid.Row="2"
+                             FontFamily="Consolas"
+                             FontSize="13"/>
+                </Grid>
+            </TabItem>
+
+            
+            <TabItem Header="Statisztika">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Top keresesek"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Margin="0,0,0,10"/>
+
+                    <ListView x:Name="StatsList" Grid.Row="1">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Kereses"
+                                                DisplayMemberBinding="{Binding Query}"
+                                                Width="620"/>
+                                <GridViewColumn Header="Darab"
+                                                DisplayMemberBinding="{Binding Count}"
+                                                Width="140"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Grid>
+            </TabItem>
+
+            
+            <TabItem Header="Felhasznalok">
+                <Grid Margin="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Felhasznaloi esemenyek"
+                               FontSize="22"
+                               FontWeight="Bold"
+                               Margin="0,0,0,10"/>
+
+                    <Grid Grid.Row="1" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox x:Name="UserSearchBox"
+                                 Height="28"
+                                 VerticalContentAlignment="Center"
+                                 TextChanged="UserFilters_Changed"
+                                 ToolTip="Kereses (id, nev, action, ip, query)"/>
+
+                        <Button Grid.Column="1"
+                                Content="Frissites"
+                                Height="28"
+                                Padding="14,0"
+                                Margin="12,0,0,0"
+                                Click="Refresh_Click"/>
+                    </Grid>
+
+                    <ListView x:Name="UserEventsList" Grid.Row="2">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Ido" DisplayMemberBinding="{Binding Time}" Width="170"/>
+                                <GridViewColumn Header="UserId" DisplayMemberBinding="{Binding UserId}" Width="90"/>
+                                <GridViewColumn Header="Nev" DisplayMemberBinding="{Binding Name}" Width="160"/>
+                                <GridViewColumn Header="Action" DisplayMemberBinding="{Binding Action}" Width="120"/>
+                                <GridViewColumn Header="IP" DisplayMemberBinding="{Binding Ip}" Width="140"/>
+                                <GridViewColumn Header="Query/Info" DisplayMemberBinding="{Binding QueryOrInfo}" Width="180"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+
+                    <TextBlock Grid.Row="3"
+                               Text="Top felhasznalok (esemenyek szama)"
+                               FontWeight="Bold"
+                               Margin="0,10,0,6"/>
+
+                    <ListView x:Name="UserStatsList" Grid.Row="4">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Felhasznalo" DisplayMemberBinding="{Binding Key}" Width="520"/>
+                                <GridViewColumn Header="Darab" DisplayMemberBinding="{Binding Count}" Width="140"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+
+                </Grid>
+            </TabItem>
+
+        </TabControl>
+    </Grid>
+</Window>
