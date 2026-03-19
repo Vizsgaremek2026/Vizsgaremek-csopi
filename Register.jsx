@@ -1,32 +1,39 @@
 import { useState } from "react";
+import { register } from "./api/auth";
 
-export default function Login({ onSwitch, onLogin }) {
+export default function Register({ onSwitch, onRegister }) {
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState(() => localStorage.getItem("loggedInUser") || "");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [focusedInput, setFocusedInput] = useState(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    const savedEmail = localStorage.getItem("loggedInUser");
-    const savedPassword = localStorage.getItem("loggedInPassword");
+  const isValidEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || "").trim());
 
-    if (!email.trim() || !password.trim()) {
-      setError("Invalid email or password");
-      setEmail("");
-      setPassword("");
+  const handleRegister = async () => {
+    const em = email.trim();
+    const pw = password.trim();
+
+    if (!em || !pw) {
+      setError("Please enter your email and password!");
       return;
     }
 
-    if (email.trim() === savedEmail && password.trim() === savedPassword) {
-      setError("");
-      onLogin();
+    if (!isValidEmail(em)) {
+      setError("Please enter a valid email address!");
       return;
     }
 
-    setError("Invalid email or password");
-    setEmail("");
-    setPassword("");
+    setLoading(true);
+    setError("");
+    try {
+      const result = await register(em, pw);
+      onRegister(result.email);
+    } catch (err) {
+      setError(err.message || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -50,11 +57,10 @@ export default function Login({ onSwitch, onLogin }) {
           width: "320px",
           display: "flex",
           flexDirection: "column",
-          gap: "16px",
-          position: "relative"
+          gap: "16px"
         }}
       >
-        <h2 style={{ color: "#fff", textAlign: "center" }}>Log in</h2>
+        <h2 style={{ color: "#fff", textAlign: "center" }}>Register</h2>
 
         {error && (
           <div style={{ color: "red", textAlign: "center", marginBottom: "-8px" }}>
@@ -62,33 +68,22 @@ export default function Login({ onSwitch, onLogin }) {
           </div>
         )}
 
-        {/* EMAIL INPUT */}
         <input
           type="email"
           placeholder="Email"
           value={email}
-          autoComplete="username"
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleLogin();
-            }
-          }}
-          onFocus={() => setFocusedInput("email")}
-          onBlur={() => setFocusedInput(null)}
+          autoComplete="off"
+          onKeyDown={(e) => e.key === "Enter" && handleRegister()}
           onChange={(e) => setEmail(e.target.value)}
           style={{
             padding: "10px",
             borderRadius: "6px",
-            border: focusedInput === "email" ? "2px solid #fff" : "none",
+            border: "none",
             background: "#222",
-            color: "#fff",
-            width: "100%",
-            outline: "none"
+            color: "#fff"
           }}
         />
 
-        {/* PASSWORD INPUT */}
         <div
           style={{
             position: "relative",
@@ -103,19 +98,12 @@ export default function Login({ onSwitch, onLogin }) {
             type={showPassword ? "text" : "password"}
             placeholder="Password"
             value={password}
-            autoComplete="current-password"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleLogin();
-              }
-            }}
-            onFocus={() => setFocusedInput("password")}
-            onBlur={() => setFocusedInput(null)}
+            autoComplete="new-password"
+            onKeyDown={(e) => e.key === "Enter" && handleRegister()}
             onChange={(e) => setPassword(e.target.value)}
             style={{
               padding: "10px 40px 10px 10px",
-              border: focusedInput === "password" ? "2px solid #fff" : "none",
+              border: "none",
               background: "transparent",
               color: "#fff",
               width: "100%",
@@ -130,16 +118,16 @@ export default function Login({ onSwitch, onLogin }) {
               right: "10px",
               cursor: "pointer",
               fontSize: "20px",
-              color: "#ffcc00"
+              color: "#ccc"
             }}
           >
             {showPassword ? "🔓" : "🔒"}
           </span>
         </div>
 
-        {/* LOGIN BUTTON */}
         <button
-          onClick={handleLogin}
+          onClick={handleRegister}
+          disabled={loading}
           style={{
             padding: "12px",
             borderRadius: "6px",
@@ -147,12 +135,13 @@ export default function Login({ onSwitch, onLogin }) {
             background: "#1db954",
             color: "#fff",
             fontWeight: "600",
-            cursor: "pointer",
+            cursor: loading ? "not-allowed" : "pointer",
             transition: "transform 0.15s ease, box-shadow 0.15s ease",
-            boxShadow: "0 4px 10px rgba(0,0,0,0.3)"
+            boxShadow: "0 4px 10px rgba(0,0,0,0.3)",
+            opacity: loading ? 0.7 : 1
           }}
         >
-          Log in
+          {loading ? "Registering…" : "Register"}
         </button>
 
         <button
@@ -167,7 +156,7 @@ export default function Login({ onSwitch, onLogin }) {
             transition: "transform 0.15s ease"
           }}
         >
-          You don't have an Account? Register!
+          Already have an Account? Log in
         </button>
       </div>
     </div>

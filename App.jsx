@@ -4,6 +4,10 @@ import Player from "./Player";
 import Login from "./Login";
 import Register from "./Register";
 import Profile from "./Profile";
+import { getLibrary, addToLibrary, removeFromLibrary } from "./api/library";
+import { getFavorites, addFavorite, removeFavorite } from "./api/favorites";
+import { getResumeTimes, saveResumeTime } from "./api/resume";
+import { saveSearchHistory } from "./api/searchHistory";
 
 const loadYouTubeAPI = () => {
   if (window.YT) return;
@@ -18,77 +22,20 @@ function App() {
   const [authView, setAuthView] = useState("login");
   const [loadingAuth, setLoadingAuth] = useState(true);
 
+  // Restore session from localStorage (just email, not data)
   useEffect(() => {
-    setAuthUser(null);
+    const saved = localStorage.getItem("sessionEmail");
+    if (saved) setAuthUser(saved);
     setLoadingAuth(false);
   }, []);
 
   const [lastSearchQuery, setLastSearchQuery] = useState("");
 
-  // ========= ✅ USER-SCOPED STORAGE KEYS =========
-  const userKey = useCallback(
-    (base) => {
-      const u = String(authUser || "").trim();
-      if (!u) return null;
-      return `${base}__${encodeURIComponent(u.toLowerCase())}`;
-    },
-    [authUser]
-  );
-
-  const readUserJson = useCallback(
-    (base, fallback) => {
-      const k = userKey(base);
-      if (!k) return fallback;
-      try {
-        const raw = localStorage.getItem(k);
-        return raw ? JSON.parse(raw) : fallback;
-      } catch {
-        return fallback;
-      }
-    },
-    [userKey]
-  );
-
-  const writeUserJson = useCallback(
-    (base, value) => {
-      const k = userKey(base);
-      if (!k) return;
-      try {
-        localStorage.setItem(k, JSON.stringify(value));
-      } catch {}
-    },
-    [userKey]
-  );
-
-  // migrate old global -> user on first login (optional but helpful)
-  const migrateGlobalToUserOnce = useCallback(() => {
-    if (!authUser) return;
-
-    const songsK = userKey("songs");
-    const favsK = userKey("favorites");
-    const timesK = userKey("resumeTimes");
-
-    try {
-      if (songsK && !localStorage.getItem(songsK) && localStorage.getItem("songs")) {
-        localStorage.setItem(songsK, localStorage.getItem("songs"));
-        localStorage.removeItem("songs");
-      }
-      if (favsK && !localStorage.getItem(favsK) && localStorage.getItem("favorites")) {
-        localStorage.setItem(favsK, localStorage.getItem("favorites"));
-        localStorage.removeItem("favorites");
-      }
-      if (timesK && !localStorage.getItem(timesK) && localStorage.getItem("resumeTimes")) {
-        localStorage.setItem(timesK, localStorage.getItem("resumeTimes"));
-        localStorage.removeItem("resumeTimes");
-      }
-    } catch {}
-  }, [authUser, userKey]);
-
   const [songs, setSongs] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [resumeTimes, setResumeTimes] = useState({});
 
-  // ✅ when authUser changes -> load that user's data
+  // Load data from API when user logs in
   useEffect(() => {
     if (!authUser) {
       setSongs([]);
@@ -97,32 +44,39 @@ function App() {
       return;
     }
 
-    migrateGlobalToUserOnce();
+    const loadUserData = async () => {
+      try {
+        const [libSongs, favSongs, resumeMap] = await Promise.all([
+          getLibrary(authUser),
+          getFavorites(authUser),
+          getResumeTimes(authUser),
+        ]);
 
-    const loadedSongs = readUserJson("songs", []);
-    const loadedFavs = readUserJson("favorites", []);
-    const loadedTimes = readUserJson("resumeTimes", {});
+        // Map API DTOs to frontend song shape
+        const toFrontendSong = (dto) => ({
+          id: dto.youtubeVideoId ? `yt_${dto.youtubeVideoId}` : `db_${dto.songId}`,
+          title: dto.title,
+          artist: dto.artist,
+          videoId: dto.youtubeVideoId || null,
+          sourceType: "youtube",
+          artwork: dto.artworkUrl || null,
+          lyrics: null,
+          dbId: dto.songId,
+        });
 
-    setSongs(Array.isArray(loadedSongs) ? loadedSongs : []);
-    setFavorites(Array.isArray(loadedFavs) ? loadedFavs : []);
-    setResumeTimes(loadedTimes && typeof loadedTimes === "object" ? loadedTimes : {});
-  }, [authUser, migrateGlobalToUserOnce, readUserJson]);
+        setSongs(Array.isArray(libSongs) ? libSongs.map(toFrontendSong) : []);
+        setFavorites(Array.isArray(favSongs) ? favSongs.map(toFrontendSong) : []);
+        setResumeTimes(resumeMap && typeof resumeMap === "object" ? resumeMap : {});
+      } catch {
+        // API unavailable – start empty
+        setSongs([]);
+        setFavorites([]);
+        setResumeTimes({});
+      }
+    };
 
-  // ✅ save per-user only
-  useEffect(() => {
-    if (!authUser) return;
-    writeUserJson("songs", songs);
-  }, [songs, authUser, writeUserJson]);
-
-  useEffect(() => {
-    if (!authUser) return;
-    writeUserJson("favorites", favorites);
-  }, [favorites, authUser, writeUserJson]);
-
-  useEffect(() => {
-    if (!authUser) return;
-    writeUserJson("resumeTimes", resumeTimes);
-  }, [resumeTimes, authUser, writeUserJson]);
+    loadUserData();
+  }, [authUser]);
 
   const [currentSong, setCurrentSong] = useState(null);
   const [view, setView] = useState("home");
@@ -363,16 +317,23 @@ function App() {
       saveCurrentTimeBeforeSwitch();
       setFavorites((prev) => {
         const isFav = prev.some((s) => s.id === song.id);
+        if (authUser && song.dbId) {
+          if (isFav) removeFavorite(authUser, song.dbId).catch(() => {});
+          else addFavorite(authUser, song.dbId).catch(() => {});
+        }
         if (isFav) return prev.filter((s) => s.id !== song.id);
         return [...prev, song];
       });
     },
-    [saveCurrentTimeBeforeSwitch]
+    [saveCurrentTimeBeforeSwitch, authUser]
   );
 
   const deleteSong = useCallback(
     (song) => {
       saveCurrentTimeBeforeSwitch();
+      if (authUser && song.dbId) {
+        removeFromLibrary(authUser, song.dbId).catch(() => {});
+      }
       setSongs((prev) => prev.filter((s) => s.id !== song.id));
       setResumeTimes((prev) => {
         const copy = { ...prev };
@@ -380,12 +341,15 @@ function App() {
         return copy;
       });
     },
-    [saveCurrentTimeBeforeSwitch]
+    [saveCurrentTimeBeforeSwitch, authUser]
   );
 
   const deleteFavorite = useCallback(
     (song) => {
       saveCurrentTimeBeforeSwitch();
+      if (authUser && song.dbId) {
+        removeFavorite(authUser, song.dbId).catch(() => {});
+      }
       setFavorites((prev) => prev.filter((s) => s.id !== song.id));
       setResumeTimes((prev) => {
         const copy = { ...prev };
@@ -393,7 +357,7 @@ function App() {
         return copy;
       });
     },
-    [saveCurrentTimeBeforeSwitch]
+    [saveCurrentTimeBeforeSwitch, authUser]
   );
 
   const searchYouTube = async () => {
@@ -404,6 +368,11 @@ function App() {
     setSearchLoading(true);
     setSearchError(null);
     setNoResults(false);
+
+    // Save search history to API
+    if (authUser) {
+      saveSearchHistory(authUser, query).catch(() => {});
+    }
 
     try {
       const res = await fetch(
@@ -495,6 +464,25 @@ function App() {
           setCurrentSong(found);
           return prevSongs;
         } else {
+          // Persist to API (fire-and-forget; update dbId once resolved)
+          if (authUser) {
+            addToLibrary(authUser, {
+              youtubeVideoId: videoId,
+              title: newSong.title,
+              artist: newSong.artist,
+              artworkUrl: newSong.artwork || null,
+            })
+              .then((res) => {
+                if (res?.songId) {
+                  setSongs((prev) =>
+                    prev.map((s) =>
+                      s.id === newSong.id ? { ...s, dbId: res.songId } : s
+                    )
+                  );
+                }
+              })
+              .catch(() => {});
+          }
           const updated = [...prevSongs, newSong];
           setCurrentSong(newSong);
           return updated;
@@ -503,22 +491,27 @@ function App() {
 
       setShowPlayer(true);
     },
-    [saveCurrentTimeBeforeSwitch]
+    [saveCurrentTimeBeforeSwitch, authUser]
   );
 
-  const handleLoginSuccess = () => {
-    setAuthUser(localStorage.getItem("loggedInUser"));
+  const handleLoginSuccess = (email) => {
+    const normalizedEmail = (email || "").trim().toLowerCase();
+    try { localStorage.setItem("sessionEmail", normalizedEmail); } catch {}
+    setAuthUser(normalizedEmail);
     setView("home");
     setMenuOpen(false);
   };
 
-  const handleRegisterSuccess = () => {
-    setAuthUser(localStorage.getItem("loggedInUser"));
+  const handleRegisterSuccess = (email) => {
+    const normalizedEmail = (email || "").trim().toLowerCase();
+    try { localStorage.setItem("sessionEmail", normalizedEmail); } catch {}
+    setAuthUser(normalizedEmail);
     setView("home");
     setMenuOpen(false);
   };
 
   const handleLogout = () => {
+    try { localStorage.removeItem("sessionEmail"); } catch {}
     setAuthUser(null);
     setAuthView("login");
     setView("home");
@@ -544,7 +537,11 @@ function App() {
       ...prev,
       [cs.id]: time
     }));
-  }, []);
+    // Persist resume time to API (debounced by the player itself)
+    if (authUser && cs.dbId) {
+      saveResumeTime(authUser, cs.dbId, Math.floor(time)).catch(() => {});
+    }
+  }, [authUser]);
 
   const onPlayerClose = useCallback((timeAtClose) => {
     const cs = currentSongRef.current;
@@ -553,9 +550,12 @@ function App() {
         ...prev,
         [cs.id]: timeAtClose
       }));
+      if (authUser && cs.dbId) {
+        saveResumeTime(authUser, cs.dbId, Math.floor(timeAtClose)).catch(() => {});
+      }
     }
     setShowPlayer(false);
-  }, []);
+  }, [authUser]);
 
   if (loadingAuth) {
     return <div style={{ color: "#fff", padding: "20px" }}>Loading...</div>;
