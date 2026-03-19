@@ -65,7 +65,7 @@ public class LibraryController : ControllerBase
 
         long songId;
 
-        // Upsert into songs
+        // Upsert into songs (INSERT or UPDATE on duplicate youtube_video_id)
         await using (var upsertCmd = _db.CreateCommand())
         {
             upsertCmd.CommandText = @"
@@ -74,13 +74,20 @@ public class LibraryController : ControllerBase
                 ON DUPLICATE KEY UPDATE
                     title = VALUES(title),
                     artist = VALUES(artist),
-                    artwork_url = VALUES(artwork_url);
-                SELECT id FROM songs WHERE youtube_video_id = @vid LIMIT 1;";
+                    artwork_url = VALUES(artwork_url)";
             upsertCmd.Parameters.AddWithValue("@vid", req.YoutubeVideoId);
             upsertCmd.Parameters.AddWithValue("@title", req.Title ?? "");
             upsertCmd.Parameters.AddWithValue("@artist", req.Artist ?? "");
             upsertCmd.Parameters.AddWithValue("@artwork", (object?)req.ArtworkUrl ?? DBNull.Value);
-            songId = Convert.ToInt64(await upsertCmd.ExecuteScalarAsync());
+            await upsertCmd.ExecuteNonQueryAsync();
+        }
+
+        // Retrieve the song id in a separate command
+        await using (var selectCmd = _db.CreateCommand())
+        {
+            selectCmd.CommandText = "SELECT id FROM songs WHERE youtube_video_id = @vid LIMIT 1";
+            selectCmd.Parameters.AddWithValue("@vid", req.YoutubeVideoId);
+            songId = Convert.ToInt64(await selectCmd.ExecuteScalarAsync());
         }
 
         // Insert into user_library if not exists

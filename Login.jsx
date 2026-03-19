@@ -160,7 +160,7 @@ export default function Login({ onSwitch, onLogin }) {
             transition: "transform 0.15s ease"
           }}
         >
-          You don&apos;t have an Account? Register!
+          You don't have an Account? Register!
         </button>
       </div>
     </div>
